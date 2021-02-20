@@ -1,0 +1,23 @@
+[package]
+name = "gnunet-rs"
+version = "0.0.0"
+description = "Rust bindings for the Gnunet C API."
+edition = "2018"
+authors = ["Danny de Jong"]
+license = "MIT"
+publish = true
+keywords = ["gnunet"]
+categories = []
+readme = "README.md"
+repository = "https://github.com/bamilab/free-speach"
+
+[lib]
+name = "gnunet"
+path = "src/lib.rs"
+
+[features]
+fs = ["gnunet-sys/fs"]
+peerstore = ["gnunet-sys/peerstore"]
+
+[dependencies]
+gnunet-sys = { path = "../gnunet-sys", version = "0.0" }
