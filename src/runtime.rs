@@ -10,3 +10,9 @@
 //! All it does is that it runs the Gnunet loop on a seperate thread, and all related functions pass the code to that loop, which executes it.
 //! 
 //! TODO: Implement
+
+
+
+pub struct Runtime {
+	
+}

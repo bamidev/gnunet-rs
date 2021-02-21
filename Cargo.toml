@@ -16,6 +16,7 @@ name = "gnunet"
 path = "src/lib.rs"
 
 [features]
+cadet = ["gnunet-sys/cadet"]
 fs = ["gnunet-sys/fs"]
 peerstore = ["gnunet-sys/peerstore"]
 

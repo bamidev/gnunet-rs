@@ -27,7 +27,7 @@ pub fn run<F>( binary_name: &str, helptext: &str, main: F ) -> GenericReturnValu
 	let empty = CString::new("").unwrap();
 	let mut option: GNUNET_GETOPT_CommandLineOption = unsafe { MaybeUninit::uninit().assume_init() };
 	option.shortName = 'a' as _;
-	option.name = empty.as_ptr();
+	option.name = ptr::null(); //empty.as_ptr();
 	option.argumentHelp = empty.as_ptr();
 	option.description = empty.as_ptr();
 	option.require_argument = GNUNET_GenericReturnValue_GNUNET_NO;
@@ -36,9 +36,7 @@ pub fn run<F>( binary_name: &str, helptext: &str, main: F ) -> GenericReturnValu
 	option.processor = Some( ffi_command_processor );
 	option.cleaner = Some( ffi_cleaner );
 
-	let mut e = first_arg.as_ptr() as *mut c_char;
-
-	eprintln!("ARG {}", first_arg.to_str().unwrap());
+	let e = first_arg.as_ptr() as *mut c_char;
 
 	// TODO: convert to C compatible argc and argv.
 	unsafe { GNUNET_PROGRAM_run( 1, &e as _, cbinary_name.as_ptr(), chelptext.as_ptr(), &option, Some( ffi_main::<F> ), closure as _ ) }
