@@ -1,6 +1,9 @@
 use gnunet_sys::*;
 
-use std::os::raw::*;
+use std::{
+	ptr,
+	os::raw::*
+};
 
 use crate::configuration;
 use crate::crypto::*;
@@ -31,14 +34,16 @@ struct PortClosureData<C,W,D> where
 	c: ChannelClosureData<W,D>
 }
 
+unsafe impl Send for Handle {}
+
 
 
 impl Handle {
 
 	pub fn connect( config: &configuration::Handle ) -> Self {
 
-		let inner = unsafe { GNUNET_CADET_connect( config.inner ) };
-
+		let inner = unsafe { GNUNET_CADET_connect( config.0 ) };
+		assert!(inner != ptr::null_mut(), "null handler");
 		Self ( inner )
 	}
 
@@ -95,6 +100,12 @@ impl Handle {
 		) };
 
 		Port ( inner )
+	}
+}
+
+impl Port {
+	pub fn close( self ) {
+		unsafe { GNUNET_CADET_close_port( self.0 ) };
 	}
 }
 

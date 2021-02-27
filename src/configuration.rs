@@ -4,9 +4,11 @@ use std::ptr;
 
 
 
-pub struct Handle {
-	pub (in crate) inner: *mut GNUNET_CONFIGURATION_Handle
-}
+#[derive(Clone, Copy)]
+pub struct Handle ( pub (in crate) *const GNUNET_CONFIGURATION_Handle );
+
+unsafe impl Send for Handle {}
+unsafe impl Sync for Handle {}
 
 
 
@@ -16,14 +18,21 @@ impl Handle {
 		let inner = unsafe { GNUNET_CONFIGURATION_create() };
 		assert!( inner != ptr::null_mut(), "inner handle cannot be null" );
 
-		Self {
+		Self (
 			inner
-		}
+		)
 	}
 
-	pub fn from_inner( inner: *mut GNUNET_CONFIGURATION_Handle ) -> Self {
-		Self {
+	pub fn from_inner( inner: *const GNUNET_CONFIGURATION_Handle ) -> Self {
+		Self (
 			inner
-		}
+		)
+	}
+}
+
+impl Default for Handle {
+
+	fn default() -> Self {
+		Self ( ptr::null() )
 	}
 }

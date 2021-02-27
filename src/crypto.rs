@@ -1,5 +1,6 @@
 use std::{
 	ffi::*,
+	os::raw::*,
 	mem::MaybeUninit
 };
 
@@ -7,6 +8,7 @@ use gnunet_sys::*;
 
 
 
+#[derive(Clone)]
 pub struct HashCode ( pub(in crate) GNUNET_HashCode );
 
 pub struct PeerIdentity (
@@ -81,5 +83,26 @@ impl HashCode {
 		unsafe { GNUNET_CRYPTO_hash( data.as_ptr() as _, data.len() as _, &mut hash.0 as _ ) };
 
 		hash
+	}
+
+	pub fn raw_data<'a>( &'a self ) -> &'a [u32; 16] {
+		&self.0.bits
+	}
+
+	pub fn raw_data_mut<'a>( &'a mut self ) -> &'a mut [u32; 16] {
+		&mut self.0.bits
+	}
+
+	pub fn to_string( &self ) -> String {
+
+		let cstr = unsafe {
+			let mut encoded: GNUNET_CRYPTO_HashAsciiEncoded = MaybeUninit::uninit().assume_init();
+
+			GNUNET_CRYPTO_hash_to_enc( &self.0 as _, &mut encoded as _ );
+
+			CStr::from_ptr( &encoded.encoding as *const u8 as *const c_char )
+		};
+
+		cstr.to_str().unwrap().to_owned()
 	}
 }
