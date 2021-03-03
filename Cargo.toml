@@ -1,6 +1,6 @@
 [package]
 name = "gnunet-rs"
-version = "0.0.1"
+version = "0.0.2"
 description = "Unofficial Rust bindings for the Gnunet API."
 edition = "2018"
 authors = ["Danny de Jong"]
@@ -22,5 +22,5 @@ peerstore = ["gnunet-sys/peerstore"]
 
 [dependencies]
 async-std = "^1.9"
-gnunet-sys = { path = "../gnunet-sys", version = "0.0" }
+gnunet-sys = { path = "../gnunet-sys", version = "0.0.4" }
 serde = "^1.0"
