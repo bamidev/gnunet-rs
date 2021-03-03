@@ -9,7 +9,7 @@ publish = true
 keywords = ["gnunet"]
 categories = []
 readme = "README.md"
-repository = "https://github.com/bamilab/free-speach"
+repository = "https://github.com/bamilab/gnunet-rs"
 
 [lib]
 name = "gnunet"
