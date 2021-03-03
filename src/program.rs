@@ -1,3 +1,7 @@
+//! This module helps you start your program with Gnunet's main loop.
+//! Use [`scheduler::add_shutdown`] to add cleanup tasks for SIGINT.
+//! Gnunet's main loop will not exit until all tasks are done and all services are disconnected.
+
 use crate::configuration;
 
 use std::{

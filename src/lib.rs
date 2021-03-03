@@ -11,6 +11,13 @@ pub mod mq;
 pub mod peerstore;
 pub mod program;
 pub mod scheduler;
+pub mod service;
+
+
+
+mod gnunet;
+pub use gnunet::*;
+pub use error::Error;
 
 
 

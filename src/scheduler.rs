@@ -31,14 +31,6 @@ pub fn add_shutdown<T>( task: T ) -> Task where
 	Task ( inner )
 }
 
-pub fn wait_on_task<T,R>( task: T ) where
-	T: FnOnce() -> R
-{
-	let cls = Box::into_raw( Box::new( task ) );
-
-
-}
-
 
 
 unsafe extern "C" fn ffi_task_callback<T>( cls: *mut c_void ) where

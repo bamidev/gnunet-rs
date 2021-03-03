@@ -1,6 +1,12 @@
 use gnunet_sys::*;
 
-use std::ptr;
+use std::{
+	ffi::*,
+	mem::MaybeUninit,
+	os::raw::*,
+	path::*,
+	ptr
+};
 
 
 
@@ -28,11 +34,44 @@ impl Handle {
 			inner
 		)
 	}
+
+	pub fn get_value_filename( &self, section: &str, option: &str ) -> PathBuf {
+
+		let csection = CString::new(section).expect("null character in `section`");
+		let coption = CString::new(option).expect("null character in `option`");
+		let mut cvalue: *mut c_char = unsafe { MaybeUninit::uninit().assume_init() };
+
+		unsafe {
+			GNUNET_CONFIGURATION_get_value_filename( self.0, csection.as_ptr(), coption.as_ptr(), &mut cvalue as _ );
+
+			let value = CStr::from_ptr( cvalue ).to_str().expect("non utf-8 character in value");
+			eprintln!("PATH: {}", &value);
+			let path: PathBuf = value.into();
+
+			GNUNET_free( cvalue as _ ); path
+		}
+	}
+
+	pub fn get_value_string( &self, section: &str, option: &str ) -> String {
+
+		let csection = CString::new(section).expect("null character in `section`");
+		let coption = CString::new(option).expect("null character in `option`");
+		let mut cvalue: *mut c_char = unsafe { MaybeUninit::uninit().assume_init() };
+
+		unsafe {
+			GNUNET_CONFIGURATION_get_value_string( self.0, csection.as_ptr(), coption.as_ptr(), &mut cvalue as _ );
+
+			let value = CStr::from_ptr( cvalue ).to_str().expect("non utf-8 character in value").to_owned();
+
+			GNUNET_free( cvalue as _ ); value
+		}
+	}
 }
 
 impl Default for Handle {
 
 	fn default() -> Self {
-		Self ( ptr::null() )
+		let inner = unsafe { GNUNET_CONFIGURATION_default() };
+		Self ( inner )
 	}
 }

@@ -1,15 +1,19 @@
 use std::{
+	convert::TryFrom,
 	ffi::*,
+	fmt,
 	os::raw::*,
 	mem::MaybeUninit
 };
 
 use gnunet_sys::*;
+use serde::{*};
 
 
 
 #[derive(Clone)]
 pub struct HashCode ( pub(in crate) GNUNET_HashCode );
+pub struct HashCodeVisitor;
 
 pub struct PeerIdentity (
 	pub (in crate) GNUNET_PeerIdentity
@@ -59,7 +63,8 @@ impl HashCode {
 	}
 
 	/// Creates a `HashCode` from its Crockford Base32hex encoded string.
-	pub fn from_string( _string: &str ) -> Self {
+	/// Returns None if the given string was not properly encoded or does not decode to a proper hash code.
+	pub fn from_string( _string: &str ) -> Option<Self> {
 
 		let mut hash = Self::new();
 
@@ -72,9 +77,11 @@ impl HashCode {
 			GNUNET_CRYPTO_hash_from_string2( string.as_ptr(), _string.len() as _, &mut hash.0 as _ )
 		};
 
-		assert!( result != GNUNET_GenericReturnValue_GNUNET_SYSERR, "hash result does not have proper Crockford Base32hex encoding" );
+		if result != GNUNET_GenericReturnValue_GNUNET_SYSERR {
+			return None;
+		}
 
-		hash
+		Some( hash )
 	}
 
 	pub fn generate( data: &[u8] ) -> Self {
@@ -95,14 +102,72 @@ impl HashCode {
 
 	pub fn to_string( &self ) -> String {
 
-		let cstr = unsafe {
+		unsafe {
 			let mut encoded: GNUNET_CRYPTO_HashAsciiEncoded = MaybeUninit::uninit().assume_init();
 
 			GNUNET_CRYPTO_hash_to_enc( &self.0 as _, &mut encoded as _ );
 
 			CStr::from_ptr( &encoded.encoding as *const u8 as *const c_char )
-		};
+				.to_str().unwrap().to_owned()
+		}
+	}
+}
 
-		cstr.to_str().unwrap().to_owned()
+impl Serialize for HashCode {
+
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where
+		S: Serializer
+	{
+		let inner_data = self.raw_data();
+		let mut buffer = [0u8; 64];
+
+		// Convert an array of u32 to an array of u8
+		for i in 0..16 {
+			let le_bytes = inner_data[i].to_le_bytes();
+
+			// Copy bytes into buffer
+			for j in 0..4 {
+				buffer[i*4 + j] = le_bytes[j];
+			}
+		}
+
+		serializer.serialize_bytes( &buffer )
+	}
+}
+
+impl<'de> Deserialize<'de> for HashCode {
+	fn deserialize<D>(deserializer: D) -> Result<HashCode, D::Error> where
+		D: Deserializer<'de>
+	{
+		deserializer.deserialize_bytes( HashCodeVisitor )
+	}
+}
+
+impl<'de> de::Visitor<'de> for HashCodeVisitor {
+
+	type Value = HashCode;
+
+	fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+		formatter.write_str("a 256-bit long byte-string")
+	}
+
+	fn visit_bytes<E>(self, bytes: &[u8]) -> Result<Self::Value, E> where
+		E: de::Error
+	{
+		if bytes.len() < 64 {
+			return Err( de::Error::custom("not enough bytes") );
+		}
+
+		// Not initializing here is safe because the `HashCode` struct only has an underlying array of u32, and we update each u32 anyway.
+		let mut result: HashCode = unsafe { MaybeUninit::uninit().assume_init() };
+
+		// Copy all bytes into array of u32's
+		for i in 0..16 {
+			let begin = i*4;	let end = begin + 4;
+			let int = u32::from_le_bytes( <[u8; 4]>::try_from( &bytes[begin..end] ).unwrap() );
+			result.raw_data_mut()[i] = int;
+		}
+
+		Ok( result )
 	}
 }
