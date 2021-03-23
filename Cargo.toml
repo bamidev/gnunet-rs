@@ -1,7 +1,7 @@
 [package]
-name = "gnunet-rs"
+name = "gnunet-async"
 version = "0.0.2"
-description = "Unofficial Rust bindings for the Gnunet API."
+description = "Unofficial async Rust bindings for the Gnunet API."
 edition = "2018"
 authors = ["Danny de Jong"]
 license = "MIT"
@@ -16,11 +16,11 @@ name = "gnunet"
 path = "src/lib.rs"
 
 [features]
-cadet = ["gnunet-sys/cadet"]
-fs = ["gnunet-sys/fs"]
-peerstore = ["gnunet-sys/peerstore"]
+single_threaded = []
 
 [dependencies]
 async-std = "^1.9"
+bincode = "^1.0"
 gnunet-sys = { path = "../gnunet-sys", version = "0.0.4" }
+rst = "0.4"
 serde = "^1.0"

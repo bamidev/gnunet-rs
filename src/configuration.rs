@@ -29,7 +29,7 @@ impl Handle {
 		)
 	}
 
-	pub fn from_inner( inner: *const GNUNET_CONFIGURATION_Handle ) -> Self {
+	pub(in crate) fn from_inner( inner: *const GNUNET_CONFIGURATION_Handle ) -> Self {
 		Self (
 			inner
 		)
@@ -45,7 +45,7 @@ impl Handle {
 			GNUNET_CONFIGURATION_get_value_filename( self.0, csection.as_ptr(), coption.as_ptr(), &mut cvalue as _ );
 
 			let value = CStr::from_ptr( cvalue ).to_str().expect("non utf-8 character in value");
-			eprintln!("PATH: {}", &value);
+			
 			let path: PathBuf = value.into();
 
 			GNUNET_free( cvalue as _ ); path

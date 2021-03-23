@@ -1,5 +1,4 @@
 use async_std::{
-	io::SeekFrom,
 	prelude::*,
 	net::Shutdown,
 	os::unix::net::UnixStream
@@ -7,10 +6,10 @@ use async_std::{
 
 use std::{
 	io,
-	mem::{self, MaybeUninit},
+	mem::{MaybeUninit},
 	ops::{Deref, DerefMut},
 	path::*,
-	slice
+	sync::Arc
 };
 
 use crate::{
@@ -21,7 +20,10 @@ use crate::{
 
 
 pub struct Service {
-	unixpath: PathBuf
+	#[cfg(feature = "single_threaded")]
+	unixpath: Rc<PathBuf>,
+	#[cfg(not(feature = "single_threaded"))]
+	unixpath: Arc<PathBuf>
 }
 
 pub struct Handle {
@@ -89,7 +91,7 @@ macro_rules! impl_service {
 impl Service {
 
 	pub async fn connect( &self ) -> io::Result<Handle> {
-		let socket = UnixStream::connect( &self.unixpath ).await?;
+		let socket = UnixStream::connect( &*self.unixpath ).await?;
 
 		Ok( Handle {
 			socket
@@ -98,7 +100,7 @@ impl Service {
 
 	pub fn new( unixpath: PathBuf ) -> Self {
 		Self {
-			unixpath
+			unixpath: Arc::new( unixpath )
 		}
 	}
 }
@@ -109,6 +111,12 @@ impl Handle {
 		match self.socket.shutdown( Shutdown::Both ) {
 			Err(e) => eprintln!("Unable to shutdown socket: {}", e),
 			Ok(()) => {}
+		}
+	}
+
+	pub(in crate) unsafe fn clone( &self ) -> Self {
+		Self {
+			socket: self.socket.clone()
 		}
 	}
 
@@ -124,6 +132,14 @@ impl Handle {
 		Ok( data )
 	}
 
+	pub(in crate) async fn read_bytes( &mut self, len: usize ) -> io::Result<Vec<u8>> {
+		let mut buffer = vec![0u8; len];
+		
+		self.read( &mut buffer ).await?;
+
+		Ok( buffer )
+	}
+
 	pub(in crate) async fn read_header( &mut self ) -> io::Result<MessageHeader> {
 
 		let size = self.read_u16().await?;
@@ -136,18 +152,18 @@ impl Handle {
 	}
 
 	// Reads the result.
-	pub(in crate) async fn read_result( &mut self, message_size: u16 ) -> io::Result<Result<(), error::Error>> {
+	pub(in crate) async fn read_result( &mut self, message_size: u16 ) -> Result<(), error::Error> {
 		
 		let result_code = self.read_u32().await?;
 		
 		if result_code == 0 {
-			return Ok(Ok(()));
+			return Ok(());
 		}
 		
 		let msg = self.read_str_zt( message_size - 4 - 4 - 1 ).await?;
 
-		let error = error::Error::new( result_code, msg );
-		Ok( Err( error ) )
+		let error = error::ResultError::new( result_code, msg );
+		Err( error.into() )
 	}
 
 	pub(in crate) async fn read_str( &mut self, len: u16 ) -> io::Result<String> {
@@ -216,7 +232,11 @@ impl Handle {
 	}
 
 	pub(in crate) async fn write_u16( &mut self, int: u16 ) -> io::Result<()> {
-		self.write( &int.to_be_bytes() ).await?; Ok(())
+		self.write_as_bytes( &int ).await?; Ok(())
+	}
+
+	pub(in crate) async fn write_u32( &mut self, int: u32 ) -> io::Result<()> {
+		self.write_as_bytes( &int ).await?; Ok(())
 	}
 }
 

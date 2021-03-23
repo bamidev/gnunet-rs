@@ -1,19 +1,19 @@
 use std::{
-	convert::TryFrom,
 	ffi::*,
 	fmt,
 	os::raw::*,
 	mem::MaybeUninit
 };
 
+use bincode;
 use gnunet_sys::*;
-use serde::{*};
+use serde::{*, ser::SerializeTuple};
 
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct HashCode ( pub(in crate) GNUNET_HashCode );
-pub struct HashCodeVisitor;
+struct HashCodeVisitor;
 
 pub struct PeerIdentity (
 	pub (in crate) GNUNET_PeerIdentity
@@ -77,13 +77,14 @@ impl HashCode {
 			GNUNET_CRYPTO_hash_from_string2( string.as_ptr(), _string.len() as _, &mut hash.0 as _ )
 		};
 
-		if result != GNUNET_GenericReturnValue_GNUNET_SYSERR {
+		if result == GNUNET_GenericReturnValue_GNUNET_SYSERR {
 			return None;
 		}
 
 		Some( hash )
 	}
 
+	/// Generates a SHA-512 hash for the given `data1`.
 	pub fn generate( data: &[u8] ) -> Self {
 		let mut hash = Self::new();
 
@@ -92,12 +93,25 @@ impl HashCode {
 		hash
 	}
 
+	/// Generates a SHA-512 hash for the `data`, serialized to the very compact bytes representation determined by bincode.
+	pub fn generate_from<S>( data: &S ) -> Self where
+		S: Serialize
+	{
+		let serialized = bincode::serialize( data ).expect("unable to serialize data for hash code");
+
+		Self::generate( &*serialized )
+	}
+
 	pub fn raw_data<'a>( &'a self ) -> &'a [u32; 16] {
 		&self.0.bits
 	}
 
 	pub fn raw_data_mut<'a>( &'a mut self ) -> &'a mut [u32; 16] {
 		&mut self.0.bits
+	}
+
+	pub fn to_bytes( &self ) -> Vec<u8> {
+		bincode::serialize( self ).unwrap()
 	}
 
 	pub fn to_string( &self ) -> String {
@@ -119,19 +133,19 @@ impl Serialize for HashCode {
 		S: Serializer
 	{
 		let inner_data = self.raw_data();
-		let mut buffer = [0u8; 64];
+		let mut s = serializer.serialize_tuple(64)?;
 
 		// Convert an array of u32 to an array of u8
-		for i in 0..16 {
+		for i in 0..16 {	// FIXME: May need to be big endian, check this...
 			let le_bytes = inner_data[i].to_le_bytes();
 
-			// Copy bytes into buffer
-			for j in 0..4 {
-				buffer[i*4 + j] = le_bytes[j];
-			}
+			s.serialize_element(&le_bytes[0])?;
+			s.serialize_element(&le_bytes[1])?;
+			s.serialize_element(&le_bytes[2])?;
+			s.serialize_element(&le_bytes[3])?;
 		}
 
-		serializer.serialize_bytes( &buffer )
+		s.end()
 	}
 }
 
@@ -139,7 +153,13 @@ impl<'de> Deserialize<'de> for HashCode {
 	fn deserialize<D>(deserializer: D) -> Result<HashCode, D::Error> where
 		D: Deserializer<'de>
 	{
-		deserializer.deserialize_bytes( HashCodeVisitor )
+		deserializer.deserialize_tuple( 64, HashCodeVisitor )
+	}
+}
+
+impl fmt::Display for HashCode {
+	fn fmt( &self, f: &mut fmt::Formatter<'_> ) -> fmt::Result {
+		write!(f, "{}", self.to_string())
 	}
 }
 
@@ -151,20 +171,21 @@ impl<'de> de::Visitor<'de> for HashCodeVisitor {
 		formatter.write_str("a 256-bit long byte-string")
 	}
 
-	fn visit_bytes<E>(self, bytes: &[u8]) -> Result<Self::Value, E> where
-		E: de::Error
+	fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where
+		A: de::SeqAccess<'de>
 	{
-		if bytes.len() < 64 {
-			return Err( de::Error::custom("not enough bytes") );
-		}
-
-		// Not initializing here is safe because the `HashCode` struct only has an underlying array of u32, and we update each u32 anyway.
+		// Not initializing here is safe because we immediately load it.
 		let mut result: HashCode = unsafe { MaybeUninit::uninit().assume_init() };
 
 		// Copy all bytes into array of u32's
 		for i in 0..16 {
-			let begin = i*4;	let end = begin + 4;
-			let int = u32::from_le_bytes( <[u8; 4]>::try_from( &bytes[begin..end] ).unwrap() );
+			let buffer: [u8; 4] = [
+				seq.next_element()?.unwrap(),
+				seq.next_element()?.unwrap(),
+				seq.next_element()?.unwrap(),
+				seq.next_element()?.unwrap()
+			];
+			let int = u32::from_le_bytes( buffer );
 			result.raw_data_mut()[i] = int;
 		}
 
